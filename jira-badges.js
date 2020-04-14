@@ -2,10 +2,11 @@
 // @name         Jira PR Badges
 // @version      1.0
 // @description  Adds badges to tickets in jira scrum board to indicate pull request status
-// @match        https://{your-jira-server}/secure/RapidBoard.jspa?rapidView=3198*
+// @match        https://{your-jira-server}/secure/RapidBoard.jspa?rapidView=9999*
 // ==/UserScript==
 
 // NOTE: to use this, find and replace all occurrences of {your-jira-server} with your actual jira server.
+// NOTE: you may also need to change the @match URL for whatever scrum board you want to run this on.
 
 const BADGE_TYPES = {
     OPEN: 'OPEN',
