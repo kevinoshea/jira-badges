@@ -2,8 +2,10 @@
 // @name         Jira PR Badges
 // @version      1.0
 // @description  Adds badges to tickets in jira scrum board to indicate pull request status
-// @match        https://jira.orionhealth.global/secure/RapidBoard.jspa?rapidView=3198*
+// @match        https://{your-jira-server}/secure/RapidBoard.jspa?rapidView=3198*
 // ==/UserScript==
+
+// NOTE: to use this, find and replace all occurrences of {your-jira-server} with your actual jira server.
 
 const BADGE_TYPES = {
     OPEN: 'OPEN',
@@ -24,14 +26,14 @@ const BADGE_TEXT = {
 };
 
 const addBadge = (ticket, keySelector) => {
-    const ticketKey = ticket.querySelector(keySelector).innerText; // eg MEM-1234
+    const ticketKey = ticket.querySelector(keySelector).innerText; // eg XYZ-1234
 
-    fetch(`https://jira.orionhealth.global/rest/api/latest/issue/${ticketKey}`).then(response => {
+    fetch(`https://{your-jira-server}/rest/api/latest/issue/${ticketKey}`).then(response => {
         return response.json();
 
     }).then(responseJson => {
         const ticketId = responseJson.id; // eg 123456
-        return fetch(`https://jira.orionhealth.global/rest/dev-status/1.0/issue/detail?issueId=${ticketId}&applicationType=stash&dataType=pullrequest`);
+        return fetch(`https://{your-jira-server}/rest/dev-status/1.0/issue/detail?issueId=${ticketId}&applicationType=stash&dataType=pullrequest`);
 
     }).then(response => {
         return response.json();
@@ -73,7 +75,7 @@ const main = () => {
         } else {
             addBadges();
         }
-    }, 1000);
+    }, 2000);
 };
 
 main();
