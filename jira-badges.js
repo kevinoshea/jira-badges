@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Jira PR Badges
-// @version      1.0
+// @version      1.1
 // @description  Adds badges to tickets in jira scrum board to indicate pull request status
-// @match        https://{your-jira-server}/secure/RapidBoard.jspa?rapidView=9999*
+// @match        https://{your-jira-server}/secure/RapidBoard.jspa?rapidView=3198*
 // ==/UserScript==
 
 // NOTE: to use this, find and replace all occurrences of {your-jira-server} with your actual jira server.
@@ -26,10 +26,27 @@ const BADGE_TEXT = {
     MERGED: 'MERGED',
 };
 
-const addBadge = (ticket, keySelector) => {
-    const ticketKey = ticket.querySelector(keySelector).innerText; // eg XYZ-1234
+const badgesCache = new Map(); // : <string, Set>
+let badgesCacheLastUpdated = 0;
 
-    fetch(`https://{your-jira-server}/rest/api/latest/issue/${ticketKey}`).then(response => {
+const cache = (ticketKey, badges) => {
+    const now = new Date();
+    badgesCache.set(ticketKey, badges);
+    badgesCacheLastUpdated = now;
+};
+
+const clearCacheIfExpired = () => {
+    const expiry = 1000 * 60 * 30; // 30 mins
+    const elapsed = new Date() - badgesCacheLastUpdated;
+    if (elapsed > expiry) {
+        badgesCache.clear();
+    }
+};
+
+const fetchBadgesAndStoreInCache = (ticketKey) => {
+    cache(ticketKey, new Set()); // store empty entry in cache immediately so we don't get multiple async fetches for the same ticket
+
+    return fetch(`https://{your-jira-server}/rest/api/latest/issue/${ticketKey}`).then(response => {
         return response.json();
 
     }).then(responseJson => {
@@ -40,7 +57,6 @@ const addBadge = (ticket, keySelector) => {
         return response.json();
 
     }).then(responseJson => {
-        const badgesAdded = [];
         const prList = responseJson?.detail?.[0]?.pullRequests;
         const badges = new Set();
         prList.forEach(pr => {
@@ -54,14 +70,34 @@ const addBadge = (ticket, keySelector) => {
                 badges.add(BADGE_TYPES.MERGED);
             }
         });
-        badges.forEach(badge => {
-            ticket.innerHTML += ` <span class="aui-lozenge ${BADGE_CLASSES[badge]}">${BADGE_TEXT[badge]}</span>`
-        });
+        cache(ticketKey, badges);
+        return badges;
 
     }).catch((err) => console.error(err));
 };
 
+const fetchBadgesOrGetFromCache = (ticketKey) => {
+    const cached = badgesCache.get(ticketKey);
+    if (cached) {
+        return Promise.resolve(cached);
+    }
+    return fetchBadgesAndStoreInCache(ticketKey);
+};
+
+const addBadge = (ticket, keySelector) => {
+    const ticketKey = ticket.querySelector(keySelector)?.innerText; // eg MEM-1234
+    if (!ticketKey) {
+        return;
+    }
+    fetchBadgesOrGetFromCache(ticketKey).then(badges => {
+        badges.forEach(badge => {
+            ticket.innerHTML += ` <span class="fancy-badge aui-lozenge ${BADGE_CLASSES[badge]}">${BADGE_TEXT[badge]}</span>`
+        });
+    }).catch((err) => console.error(err));
+};
+
 const addBadges = () => {
+    clearCacheIfExpired();
     const tickets = document.querySelectorAll('.ghx-issue-fields');
     const parentTickets = document.querySelectorAll('.ghx-heading');
     tickets.forEach(ticket => addBadge(ticket, '.ghx-key'));
@@ -70,12 +106,11 @@ const addBadges = () => {
 
 const main = () => {
     setTimeout(function() {
-        const ticketsNotLoadedYet = !document.querySelector('.ghx-issue-fields');
-        if (ticketsNotLoadedYet) {
-            main();
-        } else {
+        const noBadges = !document.querySelector('.fancy-badge');
+        if (noBadges) {
             addBadges();
         }
+        main();
     }, 2000);
 };
 
