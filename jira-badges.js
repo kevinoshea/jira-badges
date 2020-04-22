@@ -1,12 +1,9 @@
 // ==UserScript==
 // @name         Jira PR Badges
-// @version      1.1
+// @version      1.2
 // @description  Adds badges to tickets in jira scrum board to indicate pull request status
-// @match        https://{your-jira-server}/secure/RapidBoard.jspa?rapidView=3198*
+// @match        https://{your-jira-server}/secure/RapidBoard.jspa?rapidView=9999*
 // ==/UserScript==
-
-// NOTE: to use this, find and replace all occurrences of {your-jira-server} with your actual jira server.
-// NOTE: you may also need to change the @match URL for whatever scrum board you want to run this on.
 
 const BADGE_TYPES = {
     OPEN: 'OPEN',
@@ -57,6 +54,9 @@ const fetchBadgesAndStoreInCache = (ticketKey) => {
         return response.json();
 
     }).then(responseJson => {
+        if (responseJson?.errors?.length > 0) {
+            throw 'Errors detected in response for ' + ticketKey + '. Will retry.';
+        }
         const prList = responseJson?.detail?.[0]?.pullRequests;
         const badges = new Set();
         prList.forEach(pr => {
@@ -73,7 +73,11 @@ const fetchBadgesAndStoreInCache = (ticketKey) => {
         cache(ticketKey, badges);
         return badges;
 
-    }).catch((err) => console.error(err));
+    }).catch((err) => {
+        cache(ticketKey, undefined); // clear this entry from the cache so it'll try to fetch again on the next pass
+        console.error(err);
+        return new Set();
+    });
 };
 
 const fetchBadgesOrGetFromCache = (ticketKey) => {
@@ -89,7 +93,12 @@ const addBadge = (ticket, keySelector) => {
     if (!ticketKey) {
         return;
     }
+    const ticketAlreadyHasBadges = ticket.querySelector('.fancy-badge');
+    if (ticketAlreadyHasBadges && badgesCache.get(ticketKey)) {
+        return; // ticket is cached and already present
+    }
     fetchBadgesOrGetFromCache(ticketKey).then(badges => {
+        ticket.querySelectorAll('.fancy-badge').forEach(badge => badge.parentNode.removeChild(badge));
         badges.forEach(badge => {
             ticket.innerHTML += ` <span class="fancy-badge aui-lozenge ${BADGE_CLASSES[badge]}">${BADGE_TEXT[badge]}</span>`
         });
@@ -106,10 +115,7 @@ const addBadges = () => {
 
 const main = () => {
     setTimeout(function() {
-        const noBadges = !document.querySelector('.fancy-badge');
-        if (noBadges) {
-            addBadges();
-        }
+        addBadges();
         main();
     }, 2000);
 };
