@@ -1,6 +1,5 @@
-# Tools
+# Jira Badges
 
-A collection of useful tools.
+Custom browser script to augment Jira with badges to add extra information.
 
-* gittools - for running git commands over several repositories and displaying aggregated results
-
+Uses Jira APIs to pull the state of pull requests linked to the tickets on a scrum board, and displays badges on tickets to quickly indicate their state.
